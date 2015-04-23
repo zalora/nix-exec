@@ -1,11 +1,10 @@
 #include <cerrno>
 #include <cstring>
-extern "C" {
-#include <unistd.h>
 #include <err.h>
 #include <pwd.h>
 #include <sys/wait.h>
-}
+#include <unistd.h>
+#include <spawn.h>
 
 /* Work around nix's config.h */
 #undef PACKAGE_NAME
@@ -88,23 +87,31 @@ extern "C" void fetchgit( nix::EvalState & state
                               , do_submodules ? "true" : "false"
                               , nullptr
                               };
-  auto pipe = nix::Pipe();
-  pipe.create();
+  int in[2];
+  int child;
+  int rc;
+  short int flags = 0;
+  posix_spawn_file_actions_t action;
+  posix_spawnattr_t attr;
 
-  auto child = fork();
-  switch (child) {
-    case -1:
-      throw SysError("forking to run fetchgit");
-    case 0:
-      pipe.readSide.close();
-      if (dup2(pipe.writeSide, STDOUT_FILENO) == -1)
-        err(214, "duping pipe to stdout");
-      /* const-correct, execv doesn't modify it c just has dumb casting rules */
-      execv(fetchgit_path, const_cast<char * const *>(argv));
-      err(212, "executing %s", fetchgit_path);
-  }
-  pipe.writeSide.close();
-  auto path = nix::drainFD(pipe.readSide);
+  pipe(in);
+  posix_spawn_file_actions_init(&action);
+  posix_spawnattr_init(&attr);
+  posix_spawn_file_actions_adddup2(&action, in[1], 1);
+  posix_spawn_file_actions_addclose(&action, in[0]);
+
+#if defined(POSIX_SPAWN_USEVFORK)
+  flags |= POSIX_SPAWN_USEVFORK;
+#endif
+  posix_spawnattr_setflags(&attr, flags);
+
+  rc = posix_spawnp(&child, fetchgit_path, &action, &attr,
+      const_cast<char * const *>(argv), nullptr);
+  if (rc)
+    throw SysError("posix_spawnp");
+  close(in[1]);
+
+  auto path = nix::drainFD(in[0]);
 
   int status;
   errno = 0;
@@ -119,6 +126,9 @@ extern "C" void fetchgit( nix::EvalState & state
     throw Error(format("fetchgit killed by signal %1%") % strsignal(WTERMSIG(status)));
   else
     throw Error("fetchgit died in unknown manner");
+
+  posix_spawn_file_actions_destroy(&action);
+  posix_spawnattr_destroy(&attr);
 
   nix::mkPath(v, path.c_str());
 }
