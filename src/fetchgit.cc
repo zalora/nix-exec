@@ -2,9 +2,10 @@
 #include <cstring>
 #include <err.h>
 #include <pwd.h>
+#include <spawn.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <spawn.h>
 
 /* Work around nix's config.h */
 #undef PACKAGE_NAME
@@ -88,9 +89,9 @@ extern "C" void fetchgit( nix::EvalState & state
                               , nullptr
                               };
   int in[2];
-  int child;
-  int rc;
+  int status;
   short int flags = 0;
+  pid_t child;
   posix_spawn_file_actions_t action;
   posix_spawnattr_t attr;
 
@@ -105,15 +106,18 @@ extern "C" void fetchgit( nix::EvalState & state
 #endif
   posix_spawnattr_setflags(&attr, flags);
 
-  rc = posix_spawnp(&child, fetchgit_path, &action, &attr,
+  status = posix_spawnp(&child, fetchgit_path, &action, &attr,
       const_cast<char * const *>(argv), nullptr);
-  if (rc)
-    throw SysError("posix_spawnp");
   close(in[1]);
+  posix_spawn_file_actions_destroy(&action);
+  posix_spawnattr_destroy(&attr);
+
+  errno = status;
+  if (status)
+    throw SysError("posix_spawnp");
 
   auto path = nix::drainFD(in[0]);
 
-  int status;
   errno = 0;
   while (waitpid(child, &status, 0) == -1 && errno == EINTR);
   if (errno && errno != EINTR)
@@ -126,9 +130,6 @@ extern "C" void fetchgit( nix::EvalState & state
     throw Error(format("fetchgit killed by signal %1%") % strsignal(WTERMSIG(status)));
   else
     throw Error("fetchgit died in unknown manner");
-
-  posix_spawn_file_actions_destroy(&action);
-  posix_spawnattr_destroy(&attr);
 
   nix::mkPath(v, path.c_str());
 }
