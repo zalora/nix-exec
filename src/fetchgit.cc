@@ -107,7 +107,7 @@ extern "C" void fetchgit( nix::EvalState & state
   posix_spawnattr_setflags(&attr, flags);
 
   status = posix_spawnp(&child, fetchgit_path, &action, &attr,
-      const_cast<char * const *>(argv), nullptr);
+      const_cast<char * const *>(argv), environ);
   close(in[1]);
   posix_spawn_file_actions_destroy(&action);
   posix_spawnattr_destroy(&attr);
