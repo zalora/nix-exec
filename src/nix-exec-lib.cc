@@ -501,7 +501,7 @@ static void unsafe( EvalState & state
 }
 
 static void setup_builtins(EvalState & state, Value & dlopen_prim, Value & v) {
-  state.mkAttrs(v, 3);
+  state.mkAttrs(v, 4);
 
   auto unsafe_sym = state.symbols.create("unsafe-perform-io");
   auto & unsafe_perform_io = *state.allocAttr(v, unsafe_sym);
@@ -531,6 +531,18 @@ static void setup_builtins(EvalState & state, Value & dlopen_prim, Value & v) {
   state.eval(reexec_expr, reexec_fun);
   auto & reexec = *state.allocAttr(v, state.symbols.create("reexec"));
   state.callFunction(reexec_fun, dlopen_prim, reexec, Pos{});
+
+  auto decrypt_expr = state.parseExprFromString( "dlopen: spec: dlopen \""
+                                                  NIXEXEC_PLUGIN_DIR
+                                                  "/libdecrypt"
+                                                  SHREXT
+                                                  "\" \"decrypt\" [ spec ]"
+                                                , __FILE__
+                                                );
+  auto & decrypt_fun = *state.allocValue();
+  state.eval(decrypt_expr, decrypt_fun);
+  auto & decrypt = *state.allocAttr(v, state.symbols.create("decrypt"));
+  state.callFunction(decrypt_fun, dlopen_prim, decrypt, Pos{});
 
   v.attrs->sort();
 }

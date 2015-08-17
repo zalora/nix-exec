@@ -1,0 +1,21 @@
+#!@bash@
+set -eufo pipefail
+
+awk="${awk:-@awk@}"
+chmod="${chmod:-@chmod@}"
+gpg2="${gpg2:-@gpg2@}"
+mkdir="${mkdir:-@mkdir@}"
+sha1sum="${sha1sum:-@sha1sum@}"
+
+file="$1"
+cache_dir="$2"
+shift 2
+
+"$mkdir" -m 0700 -p "$cache_dir"
+"$chmod" 0700 "$cache_dir"
+
+secret=$("$sha1sum" -b "$file" | "$awk" '{print $1}')
+"$gpg2" --batch "$@" -d "$file" > "$cache_dir/$secret"
+
+exit 0
+

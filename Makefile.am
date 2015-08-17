@@ -18,16 +18,27 @@ nixlibdir = $(datadir)/nix
 nodist_nixlib_DATA = nix/unsafe-lib.nix
 
 nixexecplugindir = $(libdir)/nix-exec-plugins
-nixexecplugin_LTLIBRARIES = libfetchgit.la libreexec.la
+nixexecplugin_LTLIBRARIES = \
+	libfetchgit.la \
+	libreexec.la \
+	libdecrypt.la
+
 
 libfetchgit_la_SOURCES = src/fetchgit.cc
 libfetchgit_la_CXXFLAGS = $(AM_CXXFLAGS) -D NIXEXEC_LIBEXEC_DIR=\"$(libexecdir)\"
 
 libreexec_la_SOURCES = src/reexec.cc
 
-nodist_libexec_SCRIPTS = scripts/fetchgit.sh
+libdecrypt_la_SOURCES = src/decrypt.cc
+libdecrypt_la_CXXFLAGS = $(AM_CXXFLAGS) -D NIXEXEC_LIBEXEC_DIR=\"$(libexecdir)\"
 
-EXTRA_DIST=LICENSE README.md nix/unsafe-lib.nix.in scripts/fetchgit.sh.in
+nodist_libexec_SCRIPTS = \
+	scripts/fetchgit.sh \
+	scripts/decrypt.sh
+
+EXTRA_DIST = LICENSE README.md nix/unsafe-lib.nix.in \
+	scripts/fetchgit.sh.in \
+	scripts/decrypt.sh.in
 
 SUFFIXES = .in
 
