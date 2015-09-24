@@ -1,6 +1,4 @@
-#!@bash@
-
-set -e
+#!@sh@ -e
 
 do_submodules() {
 	repo="$1"
